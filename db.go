@@ -14,6 +14,7 @@ const (
 			hash TEXT PRIMARY KEY NOT NULL,
 			sender TEXT,
 			recipient TEXT,
+			isContract boolean,
 			gasPrice bigint,
 			gasUsed bigint,
 			timestamp TIMESTAMP 
@@ -25,6 +26,7 @@ const (
 			hash,
 			sender,
 			recipient,
+			isContract,
 			gasPrice,
 			gasUsed,
 			timestamp
@@ -32,6 +34,7 @@ const (
 			:hash,
 			:sender,
 			:recipient,
+			:isContract,
 			:gasPrice,
 			:gasUsed,
 			:timestamp
@@ -40,6 +43,24 @@ const (
 
 	GET_TX = `
 		SELECT * FROM txs WHERE hash = $1;
+	`
+
+	// I should first test how long this query takes. If it's quick <0.1 secs
+	// I won't have to store it
+	GET_TXS_PER_DAY = `
+		SELECT timestamp::date, COUNT(*) AS tx_count
+		FRPOM txs
+		GROUP BY timestamp::date
+		ORDER BY timestamp::date ASC;
+	`
+
+	// I could probably write this using `GET_TXS_PER_DAY` but this redundant solution
+	// is way easier.
+	GET_TXS_PER_MONTH = `
+		SELECT date_trunc('month', timestamp) AS tx_month, COUNT(*) AS tx_count
+		FROM txs
+		GROUP_BY tx_month
+		ORDER BY tx_month ASC;
 	`
 )
 
