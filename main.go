@@ -15,7 +15,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const INITIAL_BLOCK = 2537250
+const (
+	STARTING_BLOCK = 2537250
+	FINAL_BLOCK    = 3962263
+)
 
 func main() {
 	logFileName := fmt.Sprintf("logs/%v.log", time.Now().Unix())
@@ -45,18 +48,12 @@ func main() {
 		db:     db,
 	}
 
-	currBlockNum, err := client.BlockNumber(ctx)
-	if err != nil {
-		logger.Err(err).Msg("failed to get current block number")
-		return
-	}
-
-	middleBlock := (currBlockNum - INITIAL_BLOCK) / 2
+	middleBlock := (FINAL_BLOCK - STARTING_BLOCK) / 2
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer func() { wg.Done() }()
-		for i := int(currBlockNum); i > INITIAL_BLOCK+int(middleBlock); i-- {
+		for i := int(FINAL_BLOCK); i > STARTING_BLOCK+int(middleBlock); i-- {
 			logger := logger.With().Int("block", i).Logger()
 			logger.Info().Msg("pulling block")
 			block, err := client.BlockByNumber(ctx, big.NewInt(int64(i)))
@@ -64,9 +61,25 @@ func main() {
 				logger.Err(err).Msg("failed to get block")
 				continue
 			}
+			blockData := &BlockData{
+				Hash:     block.Hash().Hex(),
+				Number:   block.NumberU64(),
+				TxHashes: []string{},
+				BaseFee:  block.BaseFee().Uint64(),
+			}
 			for _, tx := range block.Transactions() {
+				blockData.TxHashes = append(blockData.TxHashes, tx.Hash().Hex())
 				logger := logger.With().Str("tx", tx.Hash().Hex()).Logger()
-				logger.Info().Msg("pulling tx data")
+				data, err := db.GetTx(ctx, tx.Hash())
+				if err != nil {
+					logger.Err(err).Msg("failed to retrieve tx data from database")
+					continue
+				}
+				if data != nil {
+					logger.Info().Msg("tx already exists in our database, skipping")
+					continue
+				}
+				logger.Info().Msg("pulling tx data from node")
 				txData, err := collector.GetTxData(block, tx)
 				if err != nil {
 					logger.Err(err).Msg("failed to get tx data")
@@ -79,12 +92,18 @@ func main() {
 				collector.Unlock()
 			}
 			logger.Info().Msg("done saving tx data for block")
+
+			collector.Lock()
+			if err = db.AddBlock(ctx, blockData); err != nil {
+				log.Err(err).Msg("failed to save block data")
+			}
+			collector.Unlock()
 		}
 	}()
 	wg.Add(1)
 	go func() {
 		defer func() { wg.Done() }()
-		for i := INITIAL_BLOCK; i <= INITIAL_BLOCK+int(middleBlock); i++ {
+		for i := STARTING_BLOCK; i <= STARTING_BLOCK+int(middleBlock); i++ {
 			logger := logger.With().Int("block", i).Logger()
 			logger.Info().Msg("pulling block")
 			block, err := client.BlockByNumber(ctx, big.NewInt(int64(i)))
@@ -92,9 +111,25 @@ func main() {
 				logger.Err(err).Msg("failed to get block")
 				continue
 			}
+			blockData := &BlockData{
+				Hash:     block.Hash().Hex(),
+				Number:   block.NumberU64(),
+				TxHashes: []string{},
+				BaseFee:  block.BaseFee().Uint64(),
+			}
 			for _, tx := range block.Transactions() {
+				blockData.TxHashes = append(blockData.TxHashes, tx.Hash().Hex())
 				logger := logger.With().Str("tx", tx.Hash().Hex()).Logger()
-				logger.Info().Msg("pulling tx data")
+				data, err := db.GetTx(ctx, tx.Hash())
+				if err != nil {
+					logger.Err(err).Msg("failed to retrieve tx data from database")
+					continue
+				}
+				if data != nil {
+					logger.Info().Msg("tx already exists in our database, skipping")
+					continue
+				}
+				logger.Info().Msg("pulling tx data from node")
 				txData, err := collector.GetTxData(block, tx)
 				if err != nil {
 					logger.Err(err).Msg("failed to get tx data")
@@ -107,6 +142,12 @@ func main() {
 				collector.Unlock()
 			}
 			logger.Info().Msg("done saving tx data for block")
+
+			collector.Lock()
+			if err = db.AddBlock(ctx, blockData); err != nil {
+				log.Err(err).Msg("failed to save block data")
+			}
+			collector.Unlock()
 		}
 	}()
 	wg.Wait()

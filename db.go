@@ -5,11 +5,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 const (
-	CREATE_TABLE = `
+	CREATE_TABLE_TXS = `
 		CREATE TABLE IF NOT EXISTS txs (
 			hash TEXT PRIMARY KEY NOT NULL,
 			sender TEXT,
@@ -62,6 +62,29 @@ const (
 		GROUP_BY tx_month
 		ORDER BY tx_month ASC;
 	`
+
+	CREATE_TABLE_BLOCKS = `
+		CREATE TABLE IF NOT EXISTS blocks (
+			hash TEXT PRIMARY KEY NOT NULL,
+			number BIGINT,
+			tx_hashes TEXT[],
+			base_fee BIGINT
+		);
+	`
+
+	SET_BLOCK = `
+		INSERT INTO blocks (
+			hash,
+			number,
+			tx_hashes,
+			base_fee
+		) VALUES (
+			$1,
+			$2,
+			$3,
+			$4
+		);
+	`
 )
 
 type DB struct {
@@ -74,7 +97,8 @@ func NewDB() (*DB, error) {
 		return nil, err
 	}
 
-	db.MustExec(CREATE_TABLE)
+	db.MustExec(CREATE_TABLE_TXS)
+	db.MustExec(CREATE_TABLE_BLOCKS)
 
 	return &DB{db}, nil
 }
@@ -90,4 +114,10 @@ func (db *DB) GetTx(ctx context.Context, hash common.Hash) (*TxData, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func (db *DB) AddBlock(ctx context.Context, block *BlockData) error {
+	// need to convert to pq.StringArray so we don't use NamedExecContext here
+	_, err := db.ExecContext(ctx, SET_BLOCK, block.Hash, block.Number, pq.StringArray(block.TxHashes), block.BaseFee)
+	return err
 }
