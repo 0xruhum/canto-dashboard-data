@@ -1,4 +1,4 @@
-package main
+package models
 
 import (
 	"time"
@@ -13,11 +13,4 @@ type TxData struct {
 	GasPrice   uint64    `db:"gasprice"`
 	GasUsed    uint64    `db:"gasused"`
 	Timestamp  time.Time `db:"timestamp"`
-}
-
-type BlockData struct {
-	Hash     string   `db:"hash"`
-	Number   uint64   `db:"number"`
-	TxHashes []string `db:"tx_hashes"`
-	BaseFee  uint64   `db:"base_fee"`
 }

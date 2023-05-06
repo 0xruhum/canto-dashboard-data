@@ -1,7 +1,9 @@
-package main
+package db
 
 import (
 	"context"
+
+	"github.com/0xruhum/canto-dashboard-data/pkg/models"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/jmoiron/sqlx"
@@ -14,9 +16,9 @@ const (
 			hash TEXT PRIMARY KEY NOT NULL,
 			sender TEXT,
 			recipient TEXT,
-			isContract boolean,
-			gasPrice bigint,
-			gasUsed bigint,
+			iscontract boolean,
+			gasprice bigint,
+			gasused bigint,
 			timestamp TIMESTAMP 
 		);	
 	`
@@ -26,17 +28,17 @@ const (
 			hash,
 			sender,
 			recipient,
-			isContract,
-			gasPrice,
-			gasUsed,
+			iscontract,
+			gasprice,
+			gasused,
 			timestamp
 		) VALUES (
 			:hash,
 			:sender,
 			:recipient,
-			:isContract,
-			:gasPrice,
-			:gasUsed,
+			:iscontract,
+			:gasprice,
+			:gasused,
 			:timestamp
 		);
 	`
@@ -85,6 +87,14 @@ const (
 			$4
 		);
 	`
+
+	GET_LATEST_BLOCK = `
+		SELECT MAX(number) FROM blocks;
+	`
+
+	GET_OLDEST_BLOCK = `
+		SELECT MIN(number) FROM blocks;
+	`
 )
 
 type DB struct {
@@ -103,21 +113,37 @@ func NewDB() (*DB, error) {
 	return &DB{db}, nil
 }
 
-func (db *DB) AddTx(ctx context.Context, tx *TxData) error {
+func (db *DB) AddTx(ctx context.Context, tx *models.TxData) error {
 	_, err := db.NamedExecContext(ctx, SET_TX, tx)
 	return err
 }
 
-func (db *DB) GetTx(ctx context.Context, hash common.Hash) (*TxData, error) {
-	data := &TxData{}
+func (db *DB) GetTx(ctx context.Context, hash common.Hash) (*models.TxData, error) {
+	data := &models.TxData{}
 	if err := db.GetContext(ctx, data, GET_TX, hash.Hex()); err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func (db *DB) AddBlock(ctx context.Context, block *BlockData) error {
+func (db *DB) AddBlock(ctx context.Context, block *models.BlockData) error {
 	// need to convert to pq.StringArray so we don't use NamedExecContext here
 	_, err := db.ExecContext(ctx, SET_BLOCK, block.Hash, block.Number, pq.StringArray(block.TxHashes), block.BaseFee)
 	return err
+}
+
+func (db *DB) GetLatestBlock(ctx context.Context) (int64, error) {
+	var num int64
+	if err := db.GetContext(ctx, num, GET_LATEST_BLOCK); err != nil {
+		return int64(0), err
+	}
+	return num, nil
+}
+
+func (db *DB) GetOldestBlock(ctx context.Context) (int64, error) {
+	var num int64
+	if err := db.GetContext(ctx, num, GET_OLDEST_BLOCK); err != nil {
+		return int64(0), err
+	}
+	return num, nil
 }

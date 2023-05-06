@@ -21,7 +21,7 @@ const (
 )
 
 func main() {
-	logFileName := fmt.Sprintf("logs/%v.log", time.Now().Unix())
+	logFileName := fmt.Sprintf("../logs/%v.log", time.Now().Unix())
 	logFile, err := os.Create(logFileName)
 	if err != nil {
 		log.Err(err).Msg("failed to initialize log file")
@@ -71,7 +71,8 @@ func main() {
 				blockData.TxHashes = append(blockData.TxHashes, tx.Hash().Hex())
 				logger := logger.With().Str("tx", tx.Hash().Hex()).Logger()
 				data, err := db.GetTx(ctx, tx.Hash())
-				if err != nil {
+				// if the row doesn't exist we want to add it, so we proceed
+				if err != nil && err.Error() != "sql: no rows in result set" {
 					logger.Err(err).Msg("failed to retrieve tx data from database")
 					continue
 				}
@@ -121,7 +122,7 @@ func main() {
 				blockData.TxHashes = append(blockData.TxHashes, tx.Hash().Hex())
 				logger := logger.With().Str("tx", tx.Hash().Hex()).Logger()
 				data, err := db.GetTx(ctx, tx.Hash())
-				if err != nil {
+				if err != nil && err.Error() != "sql: no rows in result set" {
 					logger.Err(err).Msg("failed to retrieve tx data from database")
 					continue
 				}
