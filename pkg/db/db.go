@@ -134,7 +134,7 @@ func (db *DB) AddBlock(ctx context.Context, block *models.BlockData) error {
 
 func (db *DB) GetLatestBlock(ctx context.Context) (int64, error) {
 	var num int64
-	if err := db.GetContext(ctx, num, GET_LATEST_BLOCK); err != nil {
+	if err := db.GetContext(ctx, &num, GET_LATEST_BLOCK); err != nil {
 		return int64(0), err
 	}
 	return num, nil
@@ -142,7 +142,7 @@ func (db *DB) GetLatestBlock(ctx context.Context) (int64, error) {
 
 func (db *DB) GetOldestBlock(ctx context.Context) (int64, error) {
 	var num int64
-	if err := db.GetContext(ctx, num, GET_OLDEST_BLOCK); err != nil {
+	if err := db.GetContext(ctx, &num, GET_OLDEST_BLOCK); err != nil {
 		return int64(0), err
 	}
 	return num, nil
