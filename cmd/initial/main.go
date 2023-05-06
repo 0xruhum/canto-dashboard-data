@@ -21,7 +21,7 @@ const (
 )
 
 func main() {
-	logFileName := fmt.Sprintf("../logs/%v.log", time.Now().Unix())
+	logFileName := fmt.Sprintf("logs/%v.log", time.Now().Unix())
 	logFile, err := os.Create(logFileName)
 	if err != nil {
 		log.Err(err).Msg("failed to initialize log file")
