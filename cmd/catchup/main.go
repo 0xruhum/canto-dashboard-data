@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/0xruhum/canto-dashboard-data/pkg/collector"
@@ -50,10 +49,5 @@ func main() {
 	}
 	collector := collector.NewCollector(logger, client, db)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer func() { wg.Done() }()
-		collector.Start(ctx, lastKnownBlock, latestBlock.Number().Int64())
-	}()
+	collector.Start(ctx, lastKnownBlock, latestBlock.Number().Int64())
 }
