@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/0xruhum/canto-dashboard-data/pkg/collector"
@@ -14,7 +17,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+func init() {
+
+}
+
 func main() {
+	regex := regexp.MustCompile(`"level":"error","block":(\d+)`)
 	logFileName := fmt.Sprintf("logs/catchup/%v.log", time.Now().Unix())
 	logFile, err := os.Create(logFileName)
 	if err != nil {
@@ -37,17 +45,24 @@ func main() {
 		return
 	}
 
-	lastKnownBlock, err := db.GetLatestBlock(ctx)
-	if err != nil {
-		logger.Err(err).Msg("failed to get last known block from database")
-		return
-	}
-	latestBlock, err := client.BlockByNumber(ctx, nil)
-	if err != nil {
-		logger.Err(err).Msg("failed to get block")
-		return
-	}
 	collector := collector.NewCollector(logger, client, db)
 
-	collector.Start(ctx, lastKnownBlock+1, latestBlock.Number().Int64())
+	oldLogFile, err := os.Open("logs/catchup/1683363860.log")
+	if err != nil {
+		logger.Err(err).Msg("failed to open old log file")
+		return
+	}
+	defer oldLogFile.Close()
+	scanner := bufio.NewScanner(oldLogFile)
+	for scanner.Scan() {
+		match := regex.FindStringSubmatch(scanner.Text())
+		if len(match) > 1 {
+			blockNumber, err := strconv.Atoi(match[1])
+			if err != nil {
+				logger.Err(err).Msg("failed to get block number from error message")
+				return
+			}
+			collector.Start(ctx, int64(blockNumber), int64(blockNumber+1))
+		}
+	}
 }
